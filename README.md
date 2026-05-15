@@ -1,4 +1,4 @@
-# Synthetic Point Cloud Generator
+# Virtual Point Cloud Scanner
 
 Minimal pipeline for generating synthetic point clouds from CAD models via raycasting.
 
