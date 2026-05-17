@@ -3,8 +3,6 @@ import numpy as np
 import tkinter as tk
 import os
 from tkinter import filedialog
-import time
-
 SUPPORTED = {".stl", ".obj", ".ply", ".gltf", ".glb"}
 
 def load_mesh_from_path(path):
@@ -85,79 +83,22 @@ def cast_all(camera_positions, mesh):
             all_points.append(points)
     return np.concatenate(all_points)
 
-def cast_for_one(camera_position, mesh):
-    mesh_t = o3d.t.geometry.TriangleMesh.from_legacy(mesh)
-    scene = o3d.t.geometry.RaycastingScene()
-    scene.add_triangles(mesh_t)
-    
-    all_points = []
-    
-    rays = scene.create_rays_pinhole(
-        fov_deg=60,
-        center=mesh.get_center(),
-        eye=np.array(camera_position),
-        up=[0, 0, 1],
-        width_px=320,
-        height_px=320
-    )
-    ans = scene.cast_rays(rays)  
-    hit = ans['t_hit'].numpy()           
-    dirs = rays.numpy()                 
-    points = dirs[..., :3] + dirs[..., 3:] * hit[..., None]
-    valid = np.isfinite(hit)
-    points = points[valid]
-    if points.size > 0:
-        all_points.append(points)
-    return np.concatenate(all_points)
-
+            
 def main():
     path = pick_file()
     mesh = load_mesh_from_path(path)
     bbox = mesh.get_axis_aligned_bounding_box()
     camera_positions = make_camera_pass(bbox)
-    # points = cast_all(camera_positions, mesh)
-    # pcd.points = o3d.utility.Vector3dVector(points)
-    
+    points = cast_all(camera_positions, mesh)
     pcd = o3d.geometry.PointCloud()
-    vis = create_scene(mesh)
+    pcd.points = o3d.utility.Vector3dVector(points)
+    scene = create_scene(mesh)
     spheres = positions_to_spheres(camera_positions)
     for sphere in spheres:
-        vis.add_geometry(sphere)
-    vis.add_geometry(pcd)
-
-    sum_of_points = np.empty((0, 3))
-    mesh_t = o3d.t.geometry.TriangleMesh.from_legacy(mesh)
-    scene = o3d.t.geometry.RaycastingScene()
-    for cam_pos in camera_positions:
-        all_points = []
-        scene.add_triangles(mesh_t)
-        rays = scene.create_rays_pinhole(
-            fov_deg=60,
-            center=mesh.get_center(),
-            eye=np.array(cam_pos),
-            up=[0, 0, 1],
-            width_px=64,
-            height_px=64
-        )
-        ans = scene.cast_rays(rays)  
-        hit = ans['t_hit'].numpy()           
-        dirs = rays.numpy()                 
-        points = dirs[..., :3] + dirs[..., 3:] * hit[..., None]
-        valid = np.isfinite(hit)
-        points = points[valid]
-        if points.size > 0:
-            all_points.append(points)
-            np.concatenate(all_points)
-        
-        sum_of_points = np.concatenate([sum_of_points] + all_points)
-        pcd.points = o3d.utility.Vector3dVector(sum_of_points)
-        vis.update_geometry(pcd)
-        vis.poll_events()
-        vis.update_renderer()
-        time.sleep(0.1)  # Adjust delay as needed for visualization
-
-    vis.run()
-    vis.destroy_window()
+        scene.add_geometry(sphere)
+    scene.add_geometry(pcd)
+    scene.run()
+    scene.destroy_window()
     output_path = os.path.splitext(path)[0] + ".ply"
     o3d.io.write_point_cloud(output_path, pcd)
 
