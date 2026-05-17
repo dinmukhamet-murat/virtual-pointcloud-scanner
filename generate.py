@@ -3,10 +3,16 @@ import numpy as np
 import tkinter as tk
 import os
 from tkinter import filedialog
+SUPPORTED = {".stl", ".obj", ".ply", ".gltf", ".glb"}
 
-def load_stl_from_path(path):
+def load_mesh_from_path(path):
+    ext = os.path.splitext(path)[1].lower()
+    if ext not in SUPPORTED:
+        raise ValueError(f"Unsupported format: {ext}")
     mesh = o3d.io.read_triangle_mesh(path)
-    mesh.translate(-mesh.get_center())  # Center the mesh at the origin
+    if len(mesh.triangles) == 0:
+        raise ValueError(f"{path} has no triangles — possibly a point cloud, not a mesh")
+    mesh.translate(-mesh.get_center())
     return mesh
 
 def create_scene(mesh):
@@ -18,7 +24,13 @@ def create_scene(mesh):
 def pick_file():
     root = tk.Tk()
     root.withdraw()  
-    file_path = filedialog.askopenfilename(title="Select STL file", filetypes=[("STL files", "*.stl")])
+    file_path = filedialog.askopenfilename(title="Select Mesh file", filetypes=[
+    ("All supported", "*.stl *.STL *.obj *.OBJ *.ply *.PLY *.gltf *.glb"),
+    ("STL files", "*.stl *.STL"),
+    ("OBJ files", "*.obj *.OBJ"),
+    ("PLY files", "*.ply *.PLY"),
+    ("glTF files", "*.gltf *.glb"),
+])
     return file_path
     
 def make_camera_pass(bbox):
@@ -74,7 +86,7 @@ def cast_all(camera_positions, mesh):
             
 def main():
     path = pick_file()
-    mesh = load_stl_from_path(path)
+    mesh = load_mesh_from_path(path)
     bbox = mesh.get_axis_aligned_bounding_box()
     camera_positions = make_camera_pass(bbox)
     points = cast_all(camera_positions, mesh)
